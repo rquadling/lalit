@@ -27,7 +27,17 @@ class XML2Array
     /**
      * @var string
      */
-    private static $encoding = 'UTF-8';
+    private static $cdata;
+
+    /**
+     * @var string
+     */
+    private static $value;
+
+    /**
+     * @var string
+     */
+    private static $attributes;
 
     /**
      * @var DOMDocument
@@ -90,13 +100,18 @@ class XML2Array
      * @param string $encoding
      * @param bool   $standalone
      * @param bool   $format_output
+     * @param string $cdata
+     * @param string $value
+     * @param string $attributes
      */
-    public static function init($version = '1.0', $encoding = 'utf-8', $standalone = false, $format_output = true)
+    public static function init($version = '1.0', $encoding = 'utf-8', $standalone = false, $format_output = true, $cdata = '@cdata', $value = '@value', $attributes = '@attributes')
     {
         self::$xml = new DomDocument($version, $encoding);
         self::$xml->xmlStandalone = $standalone;
         self::$xml->formatOutput = $format_output;
-        self::$encoding = $encoding;
+        self::$cdata = $cdata;
+        self::$value = $value;
+        self::$attributes = $attributes;
     }
 
     /**
@@ -112,7 +127,7 @@ class XML2Array
 
         switch ($node->nodeType) {
             case XML_CDATA_SECTION_NODE:
-                $output['@cdata'] = trim($node->textContent);
+                $output[self::$cdata] = trim($node->textContent);
                 break;
 
             case XML_TEXT_NODE:
@@ -162,9 +177,9 @@ class XML2Array
                     }
                     // if its an leaf node, store the value in @value instead of directly storing it.
                     if (!is_array($output)) {
-                        $output = ['@value' => $output];
+                        $output = [self::$value => $output];
                     }
-                    $output['@attributes'] = $a;
+                    $output[self::$attributes] = $a;
                 }
                 break;
         }

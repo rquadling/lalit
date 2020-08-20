@@ -27,7 +27,17 @@ class Array2XML
     /**
      * @var string
      */
-    private static $encoding = 'UTF-8';
+    private static $cdata;
+
+    /**
+     * @var string
+     */
+    private static $value;
+
+    /**
+     * @var string
+     */
+    private static $attributes;
 
     /**
      * @var DomDocument|null
@@ -73,13 +83,18 @@ class Array2XML
      * @param string $encoding
      * @param bool   $standalone
      * @param bool   $format_output
+     * @param string $cdata
+     * @param string $value
+     * @param string $attributes
      */
-    public static function init($version = '1.0', $encoding = 'utf-8', $standalone = false, $format_output = true)
+    public static function init($version = '1.0', $encoding = 'utf-8', $standalone = false, $format_output =true, $cdata = '@cdata', $value = '@value', $attributes = '@attributes')
     {
         self::$xml = new DomDocument($version, $encoding);
         self::$xml->xmlStandalone = $standalone;
         self::$xml->formatOutput = $format_output;
-        self::$encoding = $encoding;
+        self::$cdata = $cdata;
+        self::$value = $value;
+        self::$attributes = $attributes;
     }
 
     /**
@@ -116,26 +131,26 @@ class Array2XML
 
         if (is_array($arr)) {
             // get the attributes first.;
-            if (array_key_exists('@attributes', $arr) && is_array($arr['@attributes'])) {
-                foreach ($arr['@attributes'] as $key => $value) {
+            if (array_key_exists(self::$attributes, $arr) && is_array($arr[self::$attributes])) {
+                foreach ($arr[self::$attributes] as $key => $value) {
                     if (!self::isValidTagName($key)) {
                         throw new Exception('[Array2XML] Illegal character in attribute name. attribute: '.$key.' in node: '.$node_name);
                     }
                     $node->setAttribute($key, self::bool2str($value));
                 }
-                unset($arr['@attributes']); //remove the key from the array once done.
+                unset($arr[self::$attributes]); //remove the key from the array once done.
             }
 
             // check if it has a value stored in @value, if yes store the value and return
             // else check if its directly stored as string
-            if (array_key_exists('@value', $arr)) {
-                $node->appendChild($xml->createTextNode(self::bool2str($arr['@value'])));
-                unset($arr['@value']);    //remove the key from the array once done.
+            if (array_key_exists(self::$value, $arr)) {
+                $node->appendChild($xml->createTextNode(self::bool2str($arr[self::$value])));
+                unset($arr[self::$value]);    //remove the key from the array once done.
                 //return from recursion, as a note with value cannot have child nodes.
                 return $node;
-            } elseif (array_key_exists('@cdata', $arr)) {
-                $node->appendChild($xml->createCDATASection(self::bool2str($arr['@cdata'])));
-                unset($arr['@cdata']);    //remove the key from the array once done.
+            } elseif (array_key_exists(self::$cdata, $arr)) {
+                $node->appendChild($xml->createCDATASection(self::bool2str($arr[self::$cdata])));
+                unset($arr[self::$cdata]);    //remove the key from the array once done.
                 //return from recursion, as a note with cdata cannot have child nodes.
                 return $node;
             }
