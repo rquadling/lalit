@@ -5,6 +5,7 @@ namespace LaLit;
 use DOMDocument;
 use DOMNamedNodeMap;
 use DOMNode;
+use DOMXPath;
 use Exception;
 
 /**
@@ -28,6 +29,11 @@ class XML2Array
      * @var string
      */
     private static $encoding = 'UTF-8';
+
+    /**
+     * @var bool
+     */
+    private static $include_all_namespaces = false;
 
     /**
      * @var DOMDocument
@@ -78,6 +84,16 @@ class XML2Array
         }
 
         $array[$xml->documentElement->tagName] = self::convert($xml->documentElement);
+
+        // Bug 010 - Support root node namespaces.
+        $xpath = new DOMXPath($xml);
+        foreach($xpath->query('namespace::*', $xml->documentElement) as $xPathNode) {
+            // Ignore the default xml namespace for xml - potentially a problem
+            if (self::$include_all_namespaces || !($xPathNode->nodeName === 'xmlns:xml' && $xPathNode->nodeValue === 'http://www.w3.org/XML/1998/namespace')) {
+                $array[$xml->documentElement->nodeName]['@attributes'][$xPathNode->nodeName] = $xPathNode->nodeValue;
+            }
+        }
+
         self::$xml = null;    // clear the xml node in the class for 2nd time use.
 
         return $array;
@@ -90,13 +106,20 @@ class XML2Array
      * @param string $encoding
      * @param bool   $standalone
      * @param bool   $format_output
+     * @param bool   $include_all_namespaces
      */
-    public static function init($version = '1.0', $encoding = 'utf-8', $standalone = false, $format_output = true)
+    public static function init(
+        string $version = '1.0',
+        string $encoding = 'utf-8',
+        bool $standalone = false,
+        bool $format_output = true,
+        bool $include_all_namespaces = false)
     {
         self::$xml = new DomDocument($version, $encoding);
         self::$xml->xmlStandalone = $standalone;
         self::$xml->formatOutput = $format_output;
         self::$encoding = $encoding;
+        self::$include_all_namespaces = $include_all_namespaces;
     }
 
     /**
@@ -120,8 +143,7 @@ class XML2Array
                 break;
 
             case XML_ELEMENT_NODE:
-
-                // for each child node, call the covert function recursively
+                // for each child node, call the convert function recursively
                 for ($i = 0, $m = $node->childNodes->length; $i < $m; ++$i) {
                     $child = $node->childNodes->item($i);
                     $v = self::convert($child);
@@ -135,7 +157,7 @@ class XML2Array
                         $output[$t][] = $v;
                     } else {
                         //check if it is not an empty node
-                        if (!empty($v) || $v === '0') {
+                        if ($v !== '') {
                             $output = $v;
                         }
                     }
@@ -158,9 +180,9 @@ class XML2Array
                 if ($node->attributes->length) {
                     $a = [];
                     foreach ($node->attributes as $attrName => $attrNode) {
-                        $a[$attrName] = $attrNode->value;
+                        $a[$attrNode->nodeName] = $attrNode->value;
                     }
-                    // if its an leaf node, store the value in @value instead of directly storing it.
+                    // if it's a leaf node, store the value in @value instead of directly storing it.
                     if (!is_array($output)) {
                         $output = ['@value' => $output];
                     }

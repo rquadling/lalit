@@ -2,6 +2,10 @@
 
 namespace LaLit;
 
+use DOMDocument;
+use Exception;
+use PHPUnit\Framework\TestCase;
+
 define('XML_CONTENT', 'XmlContent');
 define('PHP_CONTENT', 'PhpContent');
 define('RESULTS_KEY', 'ResultsKey');
@@ -9,10 +13,8 @@ define('ATTRIBUTE_CONTENT', 'AttributeContent');
 define('VALUE_CONTENT', 'ValueContent');
 define('CDATA_CONTENT', 'CDataContent');
 define('ARRAY_TO_XML_ONLY', 'Array2XMLOnly');
-define('VALID_TEST_FOR', 'ValidTestFor');
-define('ALL_TESTS', 'AllTests');
 
-class MainLaLitTest extends \PHPUnit\Framework\TestCase
+class MainLaLitTest extends TestCase
 {
     /**
      * @param string|string[] $tags
@@ -21,6 +23,8 @@ class MainLaLitTest extends \PHPUnit\Framework\TestCase
      */
     private function generateTags($tags)
     {
+        static $resultCount = null;
+
         if (is_array($tags)) {
             $tag = array_shift($tags);
         } else {
@@ -40,11 +44,27 @@ class MainLaLitTest extends \PHPUnit\Framework\TestCase
                     ],
                 ],
             ],
+            'Empty namespaced attribute' => [
+                XML_CONTENT => ' xml:attribute1=""',
+                PHP_CONTENT => [
+                    '@attributes' => [
+                        'xml:attribute1' => '',
+                    ],
+                ],
+            ],
             'Encoded attribute' => [
                 XML_CONTENT => ' attribute2="&lt;important&gt;"',
                 PHP_CONTENT => [
                     '@attributes' => [
                         'attribute2' => '<important>',
+                    ],
+                ],
+            ],
+            'Encoded namespaced attribute' => [
+                XML_CONTENT => ' xml:attribute2="&lt;important&gt;"',
+                PHP_CONTENT => [
+                    '@attributes' => [
+                        'xml:attribute2' => '<important>',
                     ],
                 ],
             ],
@@ -56,11 +76,27 @@ class MainLaLitTest extends \PHPUnit\Framework\TestCase
                     ],
                 ],
             ],
+            'Simple namespaced attribute' => [
+                XML_CONTENT => ' xml:attribute3="1"',
+                PHP_CONTENT => [
+                    '@attributes' => [
+                        'xml:attribute3' => '1',
+                    ],
+                ],
+            ],
             'Quoted and encoded attribute' => [
                 XML_CONTENT => ' attribute4="\'&lt;important&gt;\'"',
                 PHP_CONTENT => [
                     '@attributes' => [
                         'attribute4' => '\'<important>\'',
+                    ],
+                ],
+            ],
+            'Quoted and encoded namespaced attribute' => [
+                XML_CONTENT => ' xml:attribute4="\'&lt;important&gt;\'"',
+                PHP_CONTENT => [
+                    '@attributes' => [
+                        'xml:attribute4' => '\'<important>\'',
                     ],
                 ],
             ],
@@ -72,6 +108,14 @@ class MainLaLitTest extends \PHPUnit\Framework\TestCase
                     ],
                 ],
             ],
+            'Empty quoted namespaced attribute' => [
+                XML_CONTENT => ' xml:attribute5="\'\'"',
+                PHP_CONTENT => [
+                    '@attributes' => [
+                        'xml:attribute5' => '\'\'',
+                    ],
+                ],
+            ],
             'Null attribute' => [
                 XML_CONTENT => ' attribute6=""',
                 PHP_CONTENT => [
@@ -79,7 +123,14 @@ class MainLaLitTest extends \PHPUnit\Framework\TestCase
                         'attribute6' => null, // A null in PHP will become an empty value in XML.
                     ],
                 ],
-                VALID_TEST_FOR => ARRAY_TO_XML_ONLY,
+            ],
+            'Null namespaced attribute' => [
+                XML_CONTENT => ' xml:attribute6=""',
+                PHP_CONTENT => [
+                    '@attributes' => [
+                        'xml:attribute6' => null, // A null in PHP will become an empty value in XML.
+                    ],
+                ],
             ],
             'All attributes' => [
                 XML_CONTENT => ' attribute1="" attribute2="&lt;important&gt;" attribute3="1" attribute4="\'&lt;important&gt;\'" attribute5="\'\'" attribute6=""',
@@ -93,7 +144,19 @@ class MainLaLitTest extends \PHPUnit\Framework\TestCase
                         'attribute6' => null, // A null in PHP will become an empty value in XML.
                     ],
                 ],
-                VALID_TEST_FOR => ARRAY_TO_XML_ONLY,
+            ],
+            'All namespaced attributes' => [
+                XML_CONTENT => ' xml:attribute1="" xml:attribute2="&lt;important&gt;" xml:attribute3="1" xml:attribute4="\'&lt;important&gt;\'" xml:attribute5="\'\'" xml:attribute6=""',
+                PHP_CONTENT => [
+                    '@attributes' => [
+                        'xml:attribute1' => '',
+                        'xml:attribute2' => '<important>',
+                        'xml:attribute3' => '1',
+                        'xml:attribute4' => '\'<important>\'',
+                        'xml:attribute5' => '\'\'',
+                        'xml:attribute6' => null, // A null in PHP will become an empty value in XML.
+                    ],
+                ],
             ],
             'All attributes without null attribute' => [
                 XML_CONTENT => ' attribute1="" attribute2="&lt;important&gt;" attribute3="1" attribute4="\'&lt;important&gt;\'" attribute5="\'\'"',
@@ -104,6 +167,18 @@ class MainLaLitTest extends \PHPUnit\Framework\TestCase
                         'attribute3' => '1',
                         'attribute4' => '\'<important>\'',
                         'attribute5' => '\'\'',
+                    ],
+                ],
+            ],
+            'All namespaced attributes without null attribute' => [
+                XML_CONTENT => ' xml:attribute1="" xml:attribute2="&lt;important&gt;" xml:attribute3="1" xml:attribute4="\'&lt;important&gt;\'" xml:attribute5="\'\'"',
+                PHP_CONTENT => [
+                    '@attributes' => [
+                        'xml:attribute1' => '',
+                        'xml:attribute2' => '<important>',
+                        'xml:attribute3' => '1',
+                        'xml:attribute4' => '\'<important>\'',
+                        'xml:attribute5' => '\'\'',
                     ],
                 ],
             ],
@@ -164,7 +239,7 @@ class MainLaLitTest extends \PHPUnit\Framework\TestCase
         // Build a result set.
         $results = [];
 
-        // Iterate the attribute and value sets.
+        // Iterate the attribute and value sets
         foreach ($attributeSet as $attributeType => $attribute) {
             foreach ($valueSet as $valueType => $value) {
 
@@ -181,11 +256,11 @@ class MainLaLitTest extends \PHPUnit\Framework\TestCase
                 // If the tag is not an array, then it is a single tag,
                 // build the expected XML and PHP for XML2Array and Array2XML.
                 if (!is_array($tag)) {
-                    $resultsKey = $attributeType.' - '.$valueType;
+                    $resultsKey = sprintf('%d - %s - %s', ++$resultCount, $attributeType, $valueType);
                     $results[$resultsKey][XML_CONTENT] = $xmlContent;
                     $results[$resultsKey][PHP_CONTENT][$tagName] = $phpContent;
                 } else {
-                    $resultsKey = $attributeType.' - '.$valueType.' with '.$tag[1].' nodes';
+                    $resultsKey = sprintf('%d - %s - %s with %s nodes', ++$resultCount, $attributeType, $valueType, $tag[1]);
                     // As the tag is an array, the first element is the tag name, and the second is a count.
                     // Iterate the count, building a collection of nodes.
                     $results[$resultsKey][XML_CONTENT] = '';
@@ -196,7 +271,6 @@ class MainLaLitTest extends \PHPUnit\Framework\TestCase
                     }
                 }
                 $results[$resultsKey][RESULTS_KEY] = $resultsKey;
-                $results[$resultsKey][VALID_TEST_FOR] = $results[$resultsKey][VALID_TEST_FOR] ?? ALL_TESTS;
             }
         }
 
@@ -208,9 +282,18 @@ class MainLaLitTest extends \PHPUnit\Framework\TestCase
         return array_merge(
             $this->generateTags(['root']),
             $this->generateTags(['root', 'node']),
+            $this->generateTags(['root', 'xml:node']),
             $this->generateTags(['root', ['node', 2]]),
+            $this->generateTags(['root', ['xml:node', 2]]),
             $this->generateTags(['root', 'collection', ['node', 2]]),
-            $this->generateTags(['root', ['collections', 2], ['node', 2]])
+            $this->generateTags(['root', 'xml:collection', ['node', 2]]),
+            $this->generateTags(['root', 'collection', ['xml:node', 2]]),
+            $this->generateTags(['root', 'xml:collection', ['xml:node', 2]]),
+            $this->generateTags(['root', ['collections', 2], ['node', 2]]),
+            $this->generateTags(['root', ['xml:collections', 2], ['node', 2]]),
+            $this->generateTags(['root', ['collections', 2], ['xml:node', 2]]),
+            $this->generateTags(['root', ['xml:collections', 2], ['xml:node', 2]]),
+            []
         );
     }
 
@@ -218,12 +301,18 @@ class MainLaLitTest extends \PHPUnit\Framework\TestCase
      * @dataProvider provideTestData
      *
      * @param string $xml
-     * @param string $php
+     * @param array $php
      * @param string $structure
+     *
+     * @throws Exception
      */
-    public function testArrayToXML($xml, $php, $structure, $validTestFor)
+    public function testArrayToXML(string $xml, array $php, string $structure)
     {
-        $actualResults = preg_replace('`[\\n\\r]++ *`sim', '', Array2XML::createXML('root', $php['root'])->saveXML());
+        $actualResults = preg_replace(
+            '`[\\n\\r]++ *`sim',
+            '',
+            Array2XML::createXML('root', $php['root'])->saveXML()
+        );
         $expectedResults = '<?xml version="1.0" encoding="utf-8" standalone="no"?>'.$xml;
 
         $this->assertEquals($expectedResults, $actualResults, $structure);
@@ -233,14 +322,14 @@ class MainLaLitTest extends \PHPUnit\Framework\TestCase
      * @dataProvider provideTestData
      *
      * @param string $xml
-     * @param string $php
+     * @param array $php
      * @param string $structure
      *
-     * @throws \Exception
+     * @throws Exception
      */
-    public function testXMLToArray($xml, $php, $structure, $validTestFor)
+    public function testXMLToArray(string $xml, array $php, string $structure)
     {
-        $xmlDOM = new \DOMDocument(1.0, 'UTF-8');
+        $xmlDOM = new DOMDocument(1.0, 'UTF-8');
         $xmlDOM->xmlStandalone = false;
         $xmlDOM->preserveWhiteSpace = false;
         $xmlDOM->loadXML($xml);
